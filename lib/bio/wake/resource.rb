@@ -6,54 +6,42 @@ class Wake
 		def initialize(name)
 			@name = name
 			@path = Dir.pwd
-			ENV["PATH"] << ":#{@path}/software/#{@name}:#{@path}/software/#{@name}/bin"
+			ENV["PATH"] = ENV["PATH"]+":#{@path}/software/#{@name}:#{@path}/software/#{@name}/bin"
 		end
 
 		def install(opts = {})
-          puts "Downloading #{url}"
-          filename = opts[:url].split('/')[-1]
-          FileUtils.mkdir_p @path+"/software"
-          pbar = nil
-          open(opts[:url],"rb",
-            :content_length_proc => lambda {|t|
-              if t && 0 < t
-                pbar = ProgressBar.new('', t)
-                pbar.file_transfer_mode
-              end
-            },
-            :progress_proc => lambda {|s|
-              pbar.set s if pbar
-            }) do |remote|
-              open("software/"+filename,"wb") {|file| file.write remote.read(16384) until remote.eof?}
-            end
-            puts "\nDone"
-          end
-          puts "Uncompressing..."
-          uncompress_any(@path+"/software/"+filename)
-          compile(filename,opts[:type]) if opts[:type] == :make or opts[:type] == :make_install
+        	puts "Downloading #{opts[:url]}"
+        	mkdir_p @path+"/software"
+        	cd(@path+"/software") {system "wget #{opts[:url]}"}
+        	puts "\nDone"
+         	puts "Uncompressing..."
+         	command,basename = file_type(opts[:file])
+         	puts command+" "+basename
+        	uncompress_any(@path+"/software/"+opts[:file],command)
+        	compile(basename,opts[:type]) if opts[:type] == :make or opts[:type] == :make_install
 		end
 
 private
 
-		def uncompress_command(suffix)
-            case suffix
-            	when "bz2" then "tar xvfj"
-            	when "gz" then "tar xvfz"
-            	when "zip" then "unzip"
-            	when "tgz" then "tar xvfz"
+		def file_type(filename)
+            case filename.split(".")[-1]
+            	when "bz2" then return "tar xvfj",filename.split(".tar.bz2").first
+            	when "gz" then return "tar xvfz", filename.split(".tar.gz").first
+            	when "zip" then return "unzip", filename.split(".zip").first
+            	when "tgz" then return "tar xvfz", filename.split(".tgz").first
             else
-              	raise "Unkonw suffix."
+              	raise "Unknown file suffix."
             end
         end
 
-        def uncompress_any(filename)
-   			command = uncompress_command(filename.split(".")[-1])
-   			cd @path+"/software" {system command+" filename"}
+        def uncompress_any(filename,command)
+   			puts command+" "+filename
+   			cd(@path+"/software") {system command+" "+filename}
         end
 
-        def compile(filename,type)
-          	cd @path+"/software/"+@name do 
-            	system "PKG_CONFIG_PATH='#{@path}/sofware/pkgconfig' ./configure --prefix=#{@path}/software/#{@name}"
+        def compile(basename,type) 	
+          	cd(@path+"/software/"+basename) do 
+            	system "PKG_CONFIG_PATH='#{@path}/sofware/pkgconfig' ./configure --prefix=#{@path}/software/#{basename}"
             	system "make"
             	system "make install" if type == :make_install
             end
