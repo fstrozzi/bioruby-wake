@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+
+require 'rake'
+$: << File.expand_path(File.join((File.dirname(File.dirname __FILE__)),"lib"))
+
+require "bioruby-wake"
+
+
+if ARGV.empty?
+	puts "Error! You must provide a valid rake file"
+ 	exit
+end
+system("rake --rakefile #{ARGV.shift} #{ARGV.join(" ")}")
